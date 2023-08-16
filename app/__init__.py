@@ -5,7 +5,6 @@ from os import path
 
 
 db = SQLAlchemy()
-jwt = JWTManager()
 DB_NAME = "database.db"
 
 
@@ -15,6 +14,8 @@ def create_app():
     app.config['JWT_SECRET_KEY'] = '792543746a882f9eeb77b594360bd7f3'
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_NAME}'
     db.init_app(app)
+
+    JWTManager(app)
 
     from .views import views
     from .auth import auth
