@@ -28,7 +28,7 @@ def login():
     form_password = form_data['password']
     user = User.query.filter_by(username=form_username).first()
 
-    if not user or not check_password_hash(form_password, user.password):
+    if not user or not check_password_hash(user.password, form_password):
         return make_response('Could not verify', 401, {'WWW-Authenticate': 'Basic realm: "Login required!"'})
 
     token = create_access_token(identity=user.username)
