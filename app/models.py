@@ -17,6 +17,7 @@ class Conversation(db.Model):
     beginning_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     last_messaged_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     messages = db.relationship('Message', backref='conversation', passive_deletes=True)
+    language = db.Column(db.String(20), nullable=False)
 
 
 class Message(db.Model):
