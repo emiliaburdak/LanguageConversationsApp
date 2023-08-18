@@ -23,7 +23,7 @@ class Conversation(db.Model):
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     conversation_id = db.Column(db.Integer, db.ForeignKey('conversation.id', ondelete='CASCADE'), nullable=False)
-    author_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    is_user = db.Column(db.Boolean, default=False, nullable=False)
     message_text = db.Column(db.String(500), nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
