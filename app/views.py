@@ -3,12 +3,11 @@ from flask_jwt_extended import jwt_required
 from flask_jwt_extended import get_jwt_identity
 from models import User, Conversation, Message
 from . import db
+import openai
+import os
 
 views = Blueprint('views', __name__)
 
-chat = User(id=0, username="firendly_chat", name='Friend', password='XXX')
-db.session.add(chat)
-db.session.commit()
 
 def get_user_id_by_token_identify():
     username = get_jwt_identity()
@@ -33,6 +32,10 @@ def create_new_conversation():
     conversation_name = data_from_stt['conversation_name']
     user_id = get_user_id_by_token_identify()
     new_conversation = Conversation(conversation_name=conversation_name, user_id=user_id, language=language)
+
+    db.session.add(new_conversation)
+    db.session.commit()
+
     return jsonify({'new_conversation': new_conversation})
 
 
@@ -42,43 +45,51 @@ def speak(conversation_id):
 
     # save to database stt
 
-    # jak rozróźnia te jsnoy ? skąd wie że get_json to ten co ma te dane ? gdzieś na frontendzie się przekazuje jaka to funkcja i stąd czy jak ?
+    # jak rozróżnia te jsnoy ? skąd wie że get_json to ten co ma te dane ? gdzieś na frontendzie się przekazuje jaka to funkcja i stąd czy jak ?
     data_from_stt = request.get_json()
     # assume that this json looks like this: {stt_message='blabla', language='spanish', conversation_name= 'dupal123'}
     stt_message_text = data_from_stt['TTS_message']
-    author_id = get_user_id_by_token_identify()
-    Message(message_text=stt_message_text, author_id=author_id, conversation_id=conversation_id)
+    new_message_stt = Message(message_text=stt_message_text, conversation_id=conversation_id, is_user=True)
+
+    db.session.add(new_message_stt)
+    db.session.commit()
 
     # APIAPIAPIAPIAPIAPIAPIAPIAPI
-    # api_response looks like : {
-    #   "choices": [
-    #     {
-    #       "finish_reason": "stop",
-    #       "index": 0,
-    #       "message": {
-    #         "content": "The 2020 World Series was played in Texas at Globe Life Field in Arlington.",
-    #         "role": "assistant"
-    #       }
-    #     }
-    #   ],
-    #   "created": 1677664795,
-    #   "id": "chatcmpl-7QyqpwdfhqwajicIEznoc6Q47XAyW",
-    #   "model": "gpt-3.5-turbo-0613",
-    #   "object": "chat.completion",
-    #   "usage": {
-    #     "completion_tokens": 17,
-    #     "prompt_tokens": 57,
-    #     "total_tokens": 74
-    #   }
-    # }
 
+    conversation_object = Conversation.query.filter_by(conversation_id=conversation_id).first()
+    if not conversation_object:
+        return jsonify({'error': 'Conversation not found'}), 404
+
+    all_conversation_messages = conversation_object.messages
+    last_messages = all_conversation_messages[-4:] if len(all_conversation_messages) > 4 else all_conversation_messages
+
+    # User response with last 4 messages for context
+    messages_for_api = [{"role": "user" if message.is_user else "assistant", "content": message.message_text} for
+                        message in last_messages]
+
+    # instruction for chat
+    instruction = {"role": "system", "content": "You are a conversational assistant. Provide short, concise answers and ask follow-up questions to keep the conversation engaging."}
+
+    # full info for chat
+    messages_for_api.insert(0, instruction)
+
+    # Api
+    openai.api_key = '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'
+
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=messages_for_api
+    )
+
+    print(response.choices[0].message)
 
     # save chat answer to database
 
-    response = {}
     chat_message_text = response['choices'][0]['message']['content']
-    author_id = 0
-    Message(message_text=chat_message_text, author_id=author_id, conversation_id=conversation_id)
+    new_message_chat = Message(message_text=chat_message_text, conversation_id=conversation_id, is_user=False)
+
+    db.session.add(new_message_chat)
+    db.session.commit()
 
     return jsonify({'chat_message': chat_message_text})
 
