@@ -4,7 +4,6 @@ from flask_jwt_extended import get_jwt_identity
 from models import User, Conversation, Message
 from . import db
 import openai
-import os
 
 views = Blueprint('views', __name__)
 
@@ -23,7 +22,7 @@ def home():
     return jsonify({'message': 'Welcome to home!', 'username': username})
 
 
-@views.route('/create_new_conversation', methods=['GET'])
+@views.route('/create_new_conversation', methods=['POST'])
 @jwt_required()
 def create_new_conversation():
     data_from_stt = request.get_json()
@@ -39,13 +38,12 @@ def create_new_conversation():
     return jsonify({'new_conversation': new_conversation})
 
 
-@views.route('/speak/<conversation_id>', methods=['GET'])
+@views.route('/speak/<conversation_id>', methods=['POST'])
 @jwt_required()
 def speak(conversation_id):
 
     # save to database stt
 
-    # jak rozróżnia te jsnoy ? skąd wie że get_json to ten co ma te dane ? gdzieś na frontendzie się przekazuje jaka to funkcja i stąd czy jak ?
     data_from_stt = request.get_json()
     # assume that this json looks like this: {stt_message='blabla', language='spanish', conversation_name= 'dupal123'}
     stt_message_text = data_from_stt['TTS_message']
@@ -54,7 +52,7 @@ def speak(conversation_id):
     db.session.add(new_message_stt)
     db.session.commit()
 
-    # APIAPIAPIAPIAPIAPIAPIAPIAPI
+    # API
 
     conversation_object = Conversation.query.filter_by(conversation_id=conversation_id).first()
     if not conversation_object:
