@@ -5,7 +5,7 @@ from models import User, Conversation, Message
 from . import db
 import openai
 
-views = Blueprint('views', __name__)
+controller = Blueprint('controller', __name__)
 
 
 def get_user_id_by_token_identify():
@@ -15,14 +15,14 @@ def get_user_id_by_token_identify():
     return user_id
 
 
-@views.route('/home', methods=['GET'])
+@controller.route('/home', methods=['GET'])
 @jwt_required()
 def home():
     username = get_jwt_identity() # fetch actual useraname of user that is invoking this method
     return jsonify({'message': 'Welcome to home!', 'username': username})
 
 
-@views.route('/create_new_conversation', methods=['POST'])
+@controller.route('/create_new_conversation', methods=['POST'])
 @jwt_required()
 def create_new_conversation():
     data_from_stt = request.get_json()
@@ -38,7 +38,7 @@ def create_new_conversation():
     return jsonify({'new_conversation': new_conversation})
 
 
-@views.route('/speak/<conversation_id>', methods=['POST'])
+@controller.route('/speak/<conversation_id>', methods=['POST'])
 @jwt_required()
 def speak(conversation_id):
 
