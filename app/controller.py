@@ -34,6 +34,32 @@ def find_conversation_by_conversation_id(conversation_id):
     return conversation_object
 
 
+def save_message_to_database(message_text, conversation_id, is_user):
+    new_message = Message(message_text=message_text, conversation_id=conversation_id, is_user=is_user)
+    db.session.add(new_message)
+    db.session.commit()
+
+
+def prepare_api_payload(conversation_id):
+    conversation_object = find_conversation_by_conversation_id(conversation_id)
+    all_conversation_messages = conversation_object.messages
+    last_messages = all_conversation_messages[-4:] if len(all_conversation_messages) > 4 else all_conversation_messages
+    language = conversation_object.language
+    return language, last_messages
+
+
+def message_for_api(language, last_messages):
+    # User response with last 4 messages for context
+    messages_for_api = [{"role": "user" if message.is_user else "assistant", "content": message.message_text} for
+                        message in last_messages]
+    # instruction for chat
+    instruction = {"role": "system",
+                   "content": f"You are a conversational assistant that speak in {language}. Provide short, concise answers and ask follow-up questions to keep the conversation engaging. adapt the level of difficulty of your speech to your conversation partner"}
+    # full info for chat
+    messages_for_api.insert(0, instruction)
+    return messages_for_api
+
+
 @controller.route('/home', methods=['GET'])
 @jwt_required()
 def home():
@@ -75,63 +101,25 @@ def continue_this_conversations(conversation_id):
     return jsonify({'message_info': messages_lies_text_id_time})
 
 
-def save_message_to_database(message_text, conversation_id):
-    new_message_stt = Message(message_text=message_text, conversation_id=conversation_id, is_user=True)
-    db.session.add(new_message_stt)
-    db.session.commit()
-
-
-def prepare_api_payload(conversation_id):
-    conversation_object = find_conversation_by_conversation_id(conversation_id)
-    all_conversation_messages = conversation_object.messages
-    last_messages = all_conversation_messages[-4:] if len(all_conversation_messages) > 4 else all_conversation_messages
-    language = conversation_object.language
-    return language, last_messages
-
-
-def message_for_api(language, last_messages):
-    # User response with last 4 messages for context
-    messages_for_api = [{"role": "user" if message.is_user else "assistant", "content": message.message_text} for
-                        message in last_messages]
-    # instruction for chat
-    instruction = {"role": "system",
-                   "content": f"You are a conversational assistant that speak in {language}. Provide short, concise answers and ask follow-up questions to keep the conversation engaging. adapt the level of difficulty of your speech to your conversation partner"}
-    # full info for chat
-    messages_for_api.insert(0, instruction)
-    return messages_for_api
-
-
 @controller.route('/speak/<conversation_id>', methods=['POST'])
 @jwt_required()
-def speak(conversation_id):
+def get_chat_response(conversation_id):
     # save to database stt
-
     # assume that this json looks like this: {TTS_message='blabla'}
     data_from_stt = request.get_json()
     stt_message_text = data_from_stt['TTS_message']
-    save_message_to_database(stt_message_text, conversation_id)
+    save_message_to_database(stt_message_text, conversation_id, True)
 
-    # API
-
+    # Api messages preparation
     language, last_messages = prepare_api_payload(conversation_id)
     messages_for_api = message_for_api(language, last_messages)
 
     # Api
     openai.api_key = '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'
-
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=messages_for_api
-    )
-
-    print(response.choices[0].message)
+    response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=messages_for_api)
 
     # save chat answer to database
-
     chat_message_text = response['choices'][0]['message']['content']
-    new_message_chat = Message(message_text=chat_message_text, conversation_id=conversation_id, is_user=False)
-
-    db.session.add(new_message_chat)
-    db.session.commit()
+    save_message_to_database(chat_message_text, conversation_id, False)
 
     return jsonify({'chat_message': chat_message_text})
