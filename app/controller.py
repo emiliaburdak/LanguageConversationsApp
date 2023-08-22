@@ -80,23 +80,29 @@ def save_message_to_database(message_text, conversation_id):
     db.session.commit()
 
 
+def prepare_api_payload(conversation_id):
+    conversation_object = find_conversation_by_conversation_id(conversation_id)
+    all_conversation_messages = conversation_object.messages
+    last_messages = all_conversation_messages[-4:] if len(all_conversation_messages) > 4 else all_conversation_messages
+    language = conversation_object.language
+    return language, last_messages
+
+# def message_to_api()
+
+
 @controller.route('/speak/<conversation_id>', methods=['POST'])
 @jwt_required()
 def speak(conversation_id):
     # save to database stt
 
-    data_from_stt = request.get_json()
     # assume that this json looks like this: {TTS_message='blabla'}
+    data_from_stt = request.get_json()
     stt_message_text = data_from_stt['TTS_message']
     save_message_to_database(stt_message_text, conversation_id)
 
     # API
 
-    conversation_object = find_conversation_by_conversation_id(conversation_id)
-
-    all_conversation_messages = conversation_object.messages
-    language = conversation_object.language
-    last_messages = all_conversation_messages[-4:] if len(all_conversation_messages) > 4 else all_conversation_messages
+    language, last_messages = prepare_api_payload(conversation_id)
 
     # User response with last 4 messages for context
     messages_for_api = [{"role": "user" if message.is_user else "assistant", "content": message.message_text} for
