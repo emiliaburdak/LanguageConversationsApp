@@ -74,6 +74,12 @@ def continue_this_conversations(conversation_id):
     return jsonify({'message_info': messages_lies_text_id_time})
 
 
+def save_message_to_database(message_text, conversation_id):
+    new_message_stt = Message(message_text=message_text, conversation_id=conversation_id, is_user=True)
+    db.session.add(new_message_stt)
+    db.session.commit()
+
+
 @controller.route('/speak/<conversation_id>', methods=['POST'])
 @jwt_required()
 def speak(conversation_id):
@@ -82,10 +88,7 @@ def speak(conversation_id):
     data_from_stt = request.get_json()
     # assume that this json looks like this: {TTS_message='blabla'}
     stt_message_text = data_from_stt['TTS_message']
-    new_message_stt = Message(message_text=stt_message_text, conversation_id=conversation_id, is_user=True)
-
-    db.session.add(new_message_stt)
-    db.session.commit()
+    save_message_to_database(stt_message_text, conversation_id)
 
     # API
 
