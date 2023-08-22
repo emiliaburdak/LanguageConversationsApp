@@ -70,7 +70,8 @@ def existing_conversations():
 def continue_this_conversations(conversation_id):
     conversation_object = find_conversation_by_conversation_id(conversation_id)
     all_conversation_messages = conversation_object.messages
-    messages_lies_text_id_time = [[message.message_text, message.id, message.timestamp] for message in all_conversation_messages]
+    messages_lies_text_id_time = [[message.message_text, message.id, message.timestamp] for message in
+                                  all_conversation_messages]
     return jsonify({'message_info': messages_lies_text_id_time})
 
 
@@ -87,7 +88,17 @@ def prepare_api_payload(conversation_id):
     language = conversation_object.language
     return language, last_messages
 
-# def message_to_api()
+
+def message_for_api(language, last_messages):
+    # User response with last 4 messages for context
+    messages_for_api = [{"role": "user" if message.is_user else "assistant", "content": message.message_text} for
+                        message in last_messages]
+    # instruction for chat
+    instruction = {"role": "system",
+                   "content": f"You are a conversational assistant that speak in {language}. Provide short, concise answers and ask follow-up questions to keep the conversation engaging. adapt the level of difficulty of your speech to your conversation partner"}
+    # full info for chat
+    messages_for_api.insert(0, instruction)
+    return messages_for_api
 
 
 @controller.route('/speak/<conversation_id>', methods=['POST'])
@@ -103,17 +114,7 @@ def speak(conversation_id):
     # API
 
     language, last_messages = prepare_api_payload(conversation_id)
-
-    # User response with last 4 messages for context
-    messages_for_api = [{"role": "user" if message.is_user else "assistant", "content": message.message_text} for
-                        message in last_messages]
-
-    # instruction for chat
-    instruction = {"role": "system",
-                   "content": f"You are a conversational assistant that speak in {language}. Provide short, concise answers and ask follow-up questions to keep the conversation engaging. adapt the level of difficulty of your speech to your conversation partner"}
-
-    # full info for chat
-    messages_for_api.insert(0, instruction)
+    messages_for_api = message_for_api(language, last_messages)
 
     # Api
     openai.api_key = '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'
