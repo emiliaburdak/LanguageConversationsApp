@@ -15,16 +15,10 @@ def get_user_id_by_token_identify():
     return user_id
 
 
-def find_all_conversations_names():
-    all_existing_conv_names_tuples = Conversation.query.with_entities(Conversation.conversation_name).all()
-    all_existing_conv_names = [conversation_name[0] for conversation_name in all_existing_conv_names_tuples]
-    return all_existing_conv_names
-
-
-def find_all_conversation_id():
-    all_existing_conv_id_tuples = Conversation.query.with_entities(Conversation.id).all()
-    all_existing_conv_id = [conversation_id[0] for conversation_id in all_existing_conv_id_tuples]
-    return all_existing_conv_id
+def find_all_conversations_names_ids():
+    all_conversations_names_ids_tuple = Conversation.query.with_entities(Conversation.conversation_name, Conversation.conversation_name).all()
+    all_conversations_names_ids = [{'id': item[0], 'name': item[1]} for item in all_conversations_names_ids_tuple]
+    return all_conversations_names_ids
 
 
 def find_conversation_by_conversation_id(conversation_id):
@@ -67,9 +61,9 @@ def home():
     return jsonify({'message': 'Welcome to home!', 'username': username})
 
 
-@controller.route('/create_new_conversation', methods=['POST'])
+@controller.route('/create_conversation', methods=['POST'])
 @jwt_required()
-def create_new_conversation():
+def create_conversation():
     data_from_stt = request.get_json()
     # assume that this json looks like this: {language='spanish', conversation_name= 'conv123'}
     language = data_from_stt['language']
@@ -83,17 +77,17 @@ def create_new_conversation():
     return jsonify({'name': new_conversation.conversation_name, 'id': new_conversation.id})
 
 
-@controller.route('/existing_conversations', methods=['GET'])
+@controller.route('/conversations', methods=['GET'])
 @jwt_required()
 def existing_conversations():
-    all_existing_conv_names = find_all_conversations_names()
-    all_existing_conv_id = find_all_conversation_id()
-    return jsonify({'names': all_existing_conv_names, 'ids': all_existing_conv_id})
+    # [{name: convoname, id: 1}, {name: blah, id: 2}]
+    all_conversations_names_ids = find_all_conversations_names_ids()
+    return jsonify(all_conversations_names_ids)
 
 
-@controller.route('/continue_this_conversations/<conversation_id>', methods=['GET'])
+@controller.route('/continue_conversations/<conversation_id>', methods=['GET'])
 @jwt_required()
-def continue_this_conversations(conversation_id):
+def continue_conversations(conversation_id):
     conversation_object = find_conversation_by_conversation_id(conversation_id)
     all_conversation_messages = conversation_object.messages
     messages_lies_text_id_time = [[message.message_text, message.id, message.timestamp] for message in
@@ -101,7 +95,7 @@ def continue_this_conversations(conversation_id):
     return jsonify({'message_info': messages_lies_text_id_time})
 
 
-@controller.route('/speak/<conversation_id>', methods=['POST'])
+@controller.route('/get_chat_response/<conversation_id>', methods=['POST'])
 @jwt_required()
 def get_chat_response(conversation_id):
     # save to database stt
