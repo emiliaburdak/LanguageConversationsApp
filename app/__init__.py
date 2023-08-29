@@ -18,6 +18,7 @@ def create_app():
     JWTManager(app)
 
     from .controller import controller
+    from .service import service
     from .auth import auth
 
     app.register_blueprint(controller, url_prefix='/')
