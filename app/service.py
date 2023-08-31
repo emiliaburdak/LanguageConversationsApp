@@ -36,19 +36,28 @@ def save_message_to_database(message_text, conversation_id, is_user):
 
 def prepare_api_payload(conversation_id):
     conversation_object = find_conversation_by_conversation_id(conversation_id)
-    all_conversation_messages = conversation_object.messages
-    last_messages = all_conversation_messages[-4:] if len(all_conversation_messages) > 4 else all_conversation_messages
+    user_message = conversation_object.messages[-1]  # hi
+    if len(conversation_object.messages) > 1 and "." in conversation_object.messages[-2]:
+        last_chat_answer = conversation_object.messages[-2]  # hello. greeting.
+        sum_up_sentence = last_chat_answer.split(".")[0] + "."  # greeting.
+    else:
+        sum_up_sentence = None
     language = conversation_object.language
-    return language, last_messages
+    return language, user_message, sum_up_sentence
 
 
-def message_for_api(language, last_messages):
-    # User response with last 4 messages for context
-    messages_for_api = [{"role": "user" if message.is_user else "assistant", "content": message.message_text} for
-                        message in last_messages]
+def message_for_api(language, user_message, sum_up_sentence):
+    # User response and sum up sentence if there is one
+    sum_up_or_new_conv = ""
+    formatted_messages = [{"role": "user", "content": user_message}]
+    if sum_up_sentence:
+        sum_up_or_new_conv += sum_up_sentence
+    else:
+        sum_up_or_new_conv += "sentence"
+
     # instruction for chat
     instruction = {"role": "system",
-                   "content": f"You are a conversational assistant that speak in {language}. Provide short, concise answers and ask follow-up questions to keep the conversation engaging. adapt the level of difficulty of your speech to your conversation partner"}
-    # full info for chat
-    messages_for_api.insert(0, instruction)
-    return messages_for_api
+                   "content": f"You are a conversational assistant that speak in {language} on level A1. Provide concise, engaging answer or follow-up question that has max 10 words to this {sum_up_or_new_conv}. add one sentence at the beginning to sum up the conversation with your response, max 15 words"}
+    formatted_messages.insert(0, instruction)
+
+    return formatted_messages
