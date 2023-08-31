@@ -18,7 +18,7 @@ def home():
     return jsonify({"message": "Welcome to home!", "username": username})
 
 
-@controller.route("/create_conversation", methods=["POST"])
+@controller.route("/conversation", methods=["POST"])
 @jwt_required()
 def create_conversation():
     data_from_stt = request.get_json()
@@ -39,6 +39,8 @@ def create_conversation():
 def get_conversations():
     # [{name: convoname, id: 1}, {name: blah, id: 2}]
     all_conversations_names_ids = find_all_conversations_names_ids()
+    if all_conversations_names_ids is None:
+        return jsonify([])
     return jsonify(all_conversations_names_ids)
 
 
@@ -49,7 +51,7 @@ def get_conversation(conversation_id):
 
     name = conversation_object.conversation_name
     beginning_date = conversation_object.beginning_date
-    last_massaged_date = conversation_object.last_messaged_date
+    last_messaged_date = conversation_object.last_messaged_date
     language = conversation_object.language
 
     conversation_messages = conversation_object.messages
@@ -57,10 +59,10 @@ def get_conversation(conversation_id):
                       "timestamp": message.timestamp} for message in conversation_messages]
 
     return jsonify({"id": conversation_id, "conversation_name": name, "beginning_date": beginning_date,
-                    "last_massage_date": last_massaged_date, "language": language, "messages": messages_data})
+                    "last_message_date": last_messaged_date, "language": language, "messages": messages_data})
 
 
-@controller.route("/get_chat_response/<conversation_id>", methods=["POST"])
+@controller.route("/response/<conversation_id>", methods=["POST"])
 @jwt_required()
 def get_chat_response(conversation_id):
     # save to database stt
