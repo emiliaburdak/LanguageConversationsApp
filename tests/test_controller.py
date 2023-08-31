@@ -85,8 +85,9 @@ class ControllerTests(TestCase):
         self.assertEqual(decoded_convs_response[0]["name"], "Test Conversation 1")
         self.assertEqual(len(decoded_convs_response), 1)
 
-    def test_get_conversation(self):
+    def _create_examples_to_db(self):
         bearer_token = self.test_login_required()
+        
         user2 = User(username="testuser2", name="Test User2",
                      password=(generate_password_hash("testpassword2", method="sha256")))
         db.session.add(user2)
@@ -106,6 +107,11 @@ class ControllerTests(TestCase):
         db.session.add(message1)
         db.session.add(message2)
         db.session.commit()
+
+        return bearer_token
+
+    def test_get_conversation(self):
+        bearer_token = self._create_examples_to_db()
 
         conv_response = self.client.get(f"/conversation/1",
                                         headers={"Authorization": f"Bearer {bearer_token}"})
