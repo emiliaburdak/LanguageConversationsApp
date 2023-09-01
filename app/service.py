@@ -28,18 +28,17 @@ def find_conversation_by_conversation_id(conversation_id):
     return conversation_object
 
 
-def save_message_to_database(message_text, conversation_id, is_user):
-    new_message = Message(message_text=message_text, conversation_id=conversation_id, is_user=is_user)
+def save_message_to_database(message_text, conversation_id, is_user, summary):
+    new_message = Message(message_text=message_text, conversation_id=conversation_id, is_user=is_user, summary=summary)
     db.session.add(new_message)
     db.session.commit()
 
 
 def prepare_api_payload(conversation_id):
     conversation_object = find_conversation_by_conversation_id(conversation_id)
-    user_message = conversation_object.messages[-1]  # hi
-    if len(conversation_object.messages) > 1 and "." in conversation_object.messages[-2]:
-        last_chat_answer = conversation_object.messages[-2]  # hello. greeting.
-        sum_up_sentence = last_chat_answer.split(".")[0] + "."  # greeting.
+    user_message = conversation_object.messages[-1].message_text  # hi
+    if len(conversation_object.messages) > 1:
+        sum_up_sentence = conversation_object.messages[-2].summary  # greeting.
     else:
         sum_up_sentence = None
     language = conversation_object.language
@@ -57,7 +56,7 @@ def message_for_api(language, user_message, sum_up_sentence):
 
     # instruction for chat
     instruction = {"role": "system",
-                   "content": f"You are a conversational assistant that speak in {language} on level A1. Provide concise, engaging answer or follow-up question that has max 10 words to this {sum_up_or_new_conv}. add one sentence at the beginning to sum up the conversation with your response, max 15 words"}
+                   "content": f"You must return your whole response in JSON. You're a chat assistant fluent in {language}. Always begin with a summary sentence (max 15 words). Then, provide a concise answer or question (max 10 words) related to {sum_up_or_new_conv}. \n \n It's crucial to respond ONLY in format with key such as summary and answer. Only JSON allowed"}
     formatted_messages.insert(0, instruction)
 
     return formatted_messages

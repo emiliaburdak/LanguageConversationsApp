@@ -25,6 +25,7 @@ class Message(db.Model):
     conversation_id = db.Column(db.Integer, db.ForeignKey('conversation.id', ondelete='CASCADE'), nullable=False)
     is_user = db.Column(db.Boolean, default=False, nullable=False)
     message_text = db.Column(db.String(500), nullable=False)
+    summary = db.Column(db.String(200))
     timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
 

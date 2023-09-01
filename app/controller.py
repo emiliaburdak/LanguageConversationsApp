@@ -1,3 +1,5 @@
+import json
+
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 from flask_jwt_extended import get_jwt_identity
@@ -69,18 +71,26 @@ def get_chat_response(conversation_id):
     # assume that this json looks like this: {TTS_message='blabla'}
     data_from_stt = request.get_json()
     stt_message_text = data_from_stt["TTS_message"]
-    save_message_to_database(stt_message_text, conversation_id, True)
+    save_message_to_database(stt_message_text, conversation_id, True, None)
 
     # Api messages preparation
-    language, last_messages = prepare_api_payload(conversation_id)
-    messages_for_api = message_for_api(language, last_messages)
+    language, user_message, sum_up_sentence = prepare_api_payload(conversation_id)
+    messages_for_api = message_for_api(language, user_message, sum_up_sentence)
 
     # Api
     openai.api_key = "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"
     response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=messages_for_api)
 
     # save chat answer to database
-    chat_message_text = response["choices"][0]["message"]["content"]
-    save_message_to_database(chat_message_text, conversation_id, False)
+    chat_message_json = json.loads(response["choices"][0]["message"]["content"])
+    chat_message_answer = chat_message_json["answer"]
+    chat_message_summary = chat_message_json["summary"]
+    save_message_to_database(chat_message_answer, conversation_id, False, chat_message_summary)
 
-    return jsonify({"chat_message": chat_message_text})
+    # response for user
+    if chat_message_answer:
+        response_for_user = chat_message_answer
+    else:
+        response_for_user = "I have technical problem with answer, can you give me one more time your answer?"
+
+    return jsonify({"chat_message": response_for_user})
