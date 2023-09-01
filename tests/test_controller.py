@@ -87,7 +87,7 @@ class ControllerTests(TestCase):
 
     def _create_examples_to_db(self):
         bearer_token = self.test_login_required()
-        
+
         user2 = User(username="testuser2", name="Test User2",
                      password=(generate_password_hash("testpassword2", method="sha256")))
         db.session.add(user2)
@@ -129,21 +129,25 @@ class ControllerTests(TestCase):
         self.assertTrue(decode_conv_response["messages"][0]["is_user"])
         self.assertTrue("timestamp" in decode_conv_response["messages"][0])
 
-    def _mock_response(self):
+    def _mock_response(self, test_answer_summary):
+        mock_response = {
+            "choices": [
+                {
+                    "message": {
+                        "content": f"{test_answer_summary}"
+                    }
+                }
+            ]
+        }
+        return mock_response
+
+    def _prepare_and_call_get_chat_response(self, test_answer_summary):
         bearer_token = self.test_login_required()
         conversation = Conversation(conversation_name="Test conversation", user_id=self.test_user.id,
                                     language='Spanish')
         db.session.add(conversation)
         db.session.commit()
-        mock_response = {
-            "choices": [
-                {
-                    "message": {
-                        "content": "Test response from OpenAI"
-                    }
-                }
-            ]
-        }
+        mock_response = self._mock_response(test_answer_summary)
 
         with patch("openai.ChatCompletion.create", return_value=mock_response) as mock_openai_call:
             input_data = {"TTS_message": "test_message"}
@@ -155,7 +159,8 @@ class ControllerTests(TestCase):
         return mock_openai_call, chat_response, bearer_token, conversation
 
     def test_get_chat_response(self):
-        mock_openai_call, chat_response, bearer_token, conversation = self._mock_response()
+        test_answer_summary = '{"answer": "Test response from OpenAI", "summary": "Testing"}'
+        mock_openai_call, chat_response, bearer_token, conversation = self._prepare_and_call_get_chat_response(test_answer_summary)
 
         decoded_chat_response = json.loads(chat_response.data.decode("utf-8"))
         mock_openai_call.assert_called_once()
@@ -163,13 +168,22 @@ class ControllerTests(TestCase):
         self.assertEqual(decoded_chat_response["chat_message"], "Test response from OpenAI")
 
     def test_save_chat_response_to_db(self):
-        mock_openai_call, chat_response, bearer_token, conversation = self._mock_response()
+        test_answer_summary = '{"answer": "Test response from OpenAI", "summary": "Testing"}'
+        mock_openai_call, chat_response, bearer_token, conversation = self._prepare_and_call_get_chat_response(test_answer_summary)
 
         db_response = self.client.get(f"/conversation/{conversation.id}",
                                       headers={"Authorization": f"Bearer {bearer_token}"})
         decode_db_response = json.loads(db_response.data.decode("utf-8"))
         self.assertEqual(decode_db_response["messages"][0]["message_text"], "test_message")
         self.assertEqual(decode_db_response["messages"][1]["message_text"], "Test response from OpenAI")
+
+    def test_no_chat_response(self):
+        test_answer_summary = '{"answer": "", "summary": "Testing"}'
+        mock_openai_call, chat_response, bearer_token, conversation = self._prepare_and_call_get_chat_response(test_answer_summary)
+        decoded_chat_response = json.loads(chat_response.data.decode("utf-8"))
+        mock_openai_call.assert_called_once()
+        self.assert200(chat_response)
+        self.assertEqual(decoded_chat_response["chat_message"], "I have technical problem with answer, can you give me one more time your answer?")
 
 
 if __name__ == "__main__":
