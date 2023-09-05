@@ -160,7 +160,8 @@ class ControllerTests(TestCase):
 
     def test_get_chat_response(self):
         test_answer_summary = '{"answer": "Test response from OpenAI", "summary": "Testing"}'
-        mock_openai_call, chat_response, bearer_token, conversation = self._prepare_and_call_get_chat_response(test_answer_summary)
+        mock_openai_call, chat_response, bearer_token, conversation = self._prepare_and_call_get_chat_response(
+            test_answer_summary)
 
         decoded_chat_response = json.loads(chat_response.data.decode("utf-8"))
         mock_openai_call.assert_called_once()
@@ -169,7 +170,8 @@ class ControllerTests(TestCase):
 
     def test_save_chat_response_to_db(self):
         test_answer_summary = '{"answer": "Test response from OpenAI", "summary": "Testing"}'
-        mock_openai_call, chat_response, bearer_token, conversation = self._prepare_and_call_get_chat_response(test_answer_summary)
+        mock_openai_call, chat_response, bearer_token, conversation = self._prepare_and_call_get_chat_response(
+            test_answer_summary)
 
         db_response = self.client.get(f"/conversation/{conversation.id}",
                                       headers={"Authorization": f"Bearer {bearer_token}"})
@@ -177,13 +179,40 @@ class ControllerTests(TestCase):
         self.assertEqual(decode_db_response["messages"][0]["message_text"], "test_message")
         self.assertEqual(decode_db_response["messages"][1]["message_text"], "Test response from OpenAI")
 
-    def test_no_chat_response(self):
-        test_answer_summary = '{"answer": "", "summary": "Testing"}'
-        mock_openai_call, chat_response, bearer_token, conversation = self._prepare_and_call_get_chat_response(test_answer_summary)
+    def test_prep_empty_response(self):
+        test_answer_summary = '{"answer": "", "summary": ""}'
+        self._test_save_invalid_response(test_answer_summary)
+
+    def test_prep_json_response(self):
+        test_answer_summary = '{"invalid_json_response"}'
+        self._test_save_invalid_response(test_answer_summary)
+
+    def _test_save_invalid_response(self, test_answer_summary):
+        mock_openai_call, chat_response, bearer_token, conversation = self._prepare_and_call_get_chat_response(
+            test_answer_summary)
+        db_response = self.client.get(f"/conversation/{conversation.id}",
+                                      headers={"Authorization": f"Bearer {bearer_token}"})
+        decode_db_response = json.loads(db_response.data.decode("utf-8"))
+        self.assertEqual(len(decode_db_response["messages"]), 1)
+        self.assertEqual(decode_db_response["messages"][0]["message_text"], "test_message")
+
+    def test_chat_empty_response(self):
+        test_answer_summary = '{"answer": "", "summary": ""}'
+        mock_openai_call, chat_response, bearer_token, conversation = self._prepare_and_call_get_chat_response(
+            test_answer_summary)
         decoded_chat_response = json.loads(chat_response.data.decode("utf-8"))
         mock_openai_call.assert_called_once()
         self.assert200(chat_response)
-        self.assertEqual(decoded_chat_response["chat_message"], "I have technical problem with answer, can you give me one more time your answer?")
+        self.assertEqual(decoded_chat_response["chat_message"], "I have technical problem with answer, please repeat")
+
+    def test_chat_invalid_json_response(self):
+        test_answer_summary = '{"invalid_json_response"}'
+        mock_openai_call, chat_response, bearer_token, conversation = self._prepare_and_call_get_chat_response(
+            test_answer_summary)
+        decoded_chat_response = json.loads(chat_response.data.decode("utf-8"))
+        mock_openai_call.assert_called_once()
+        self.assert200(chat_response)
+        self.assertEqual(decoded_chat_response["chat_message"], "I have technical problem with answer, please repeat")
 
 
 if __name__ == "__main__":

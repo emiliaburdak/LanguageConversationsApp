@@ -81,16 +81,20 @@ def get_chat_response(conversation_id):
     openai.api_key = "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"
     response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=messages_for_api)
 
-    # save chat answer to database
-    chat_message_json = json.loads(response["choices"][0]["message"]["content"])
-    chat_message_answer = chat_message_json["answer"]
-    chat_message_summary = chat_message_json["summary"]
-    save_message_to_database(chat_message_answer, conversation_id, False, chat_message_summary)
+    # get chat response
+    try:
+        chat_message_json = json.loads(response["choices"][0]["message"]["content"])
+        chat_message_answer = chat_message_json.get("answer", None)
+        chat_message_summary = chat_message_json.get("summary", None)
 
-    # response for user
-    if chat_message_answer:
-        response_for_user = chat_message_answer
-    else:
-        response_for_user = "I have technical problem with answer, can you give me one more time your answer?"
+        # response for user and save to database
+        if chat_message_answer:
+            response_for_user = chat_message_answer
+            save_message_to_database(chat_message_answer, conversation_id, False, chat_message_summary)
+        else:
+            response_for_user = "I have technical problem with answer, please repeat"
+
+    except (KeyError, json.JSONDecodeError, ValueError):
+        response_for_user = "I have technical problem with answer, please repeat"
 
     return jsonify({"chat_message": response_for_user})
