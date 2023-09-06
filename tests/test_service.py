@@ -1,0 +1,111 @@
+import json
+import unittest
+from flask_testing import TestCase
+from werkzeug.security import generate_password_hash
+from flask import jsonify
+from unittest.mock import patch
+from app.service import find_all_conversations_names_ids, get_user_id_by_token_identify, \
+    find_conversation_by_conversation_id, save_message_to_database, prepare_api_payload, message_for_api
+from app import db
+from app.models import User, Conversation, Message
+from main import app
+
+
+class ServiceTests(TestCase):
+
+    def create_app(self):
+        app.config["TESTING"] = True
+        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///test.db"  # Use an in-memory database for testing
+        return app
+
+    def setUp(self):
+        db.session.remove()
+        db.drop_all()
+        db.create_all()
+        hashed_password = generate_password_hash("testpassword", method="sha256")
+        self.test_user = User(
+            username="testuser",
+            name="Test User",
+            password=hashed_password
+        )
+        db.session.add(self.test_user)
+        db.session.commit()
+
+    def tearDown(self):
+        db.session.remove()
+        db.drop_all()
+
+    # def test_login_required(self):
+    #     login = self.client.post("login", json=dict(username="testuser", password="testpassword"))
+    #     login_data = json.loads(login.data.decode("utf-8"))
+    #     bearer_token = login_data["token"]
+    #     return bearer_token
+    #
+    # def test_get_user_id_by_token_identify(self):
+    #     with patch('app.service.get_user_id_by_token_identify', return_value=self.test_user.id):
+    #         user_id = get_user_id_by_token_identify()
+    #         self.assertEqual(user_id, self.test_user.id)
+    #
+    # def test_find_all_conversations_names_ids(self):
+
+    def add_conversation_and_message(self):
+        conversation1 = Conversation(conversation_name="Test Conversation 1", user_id=self.test_user.id,
+                                     language="Spanish")
+        db.session.add(conversation1)
+        db.session.commit()
+        message1 = Message(message_text="Hello", conversation_id=conversation1.id, is_user=True, summary="Test")
+        message2 = Message(message_text="Hello Again", conversation_id=conversation1.id, is_user=True, summary=None)
+        db.session.add(message1)
+        db.session.add(message2)
+        db.session.commit()
+
+    def test_find_conversation_by_conversation_id(self):
+        self.add_conversation_and_message()
+        correct_conversation_object = find_conversation_by_conversation_id(1)
+        json_error, status_code = find_conversation_by_conversation_id(5)
+        self.assertEqual(correct_conversation_object.id, 1)
+        self.assertEqual(correct_conversation_object.conversation_name, "Test Conversation 1")
+        self.assertEqual(correct_conversation_object.language, "Spanish")
+        self.assertEqual(json_error.json, {"error": "Conversation not found"})
+        self.assertEqual(status_code, 404)
+
+    def test_save_message_to_database(self):
+        self.add_conversation_and_message()
+        save_message_to_database("test_mess", 1, True, None)
+        conversation_object = find_conversation_by_conversation_id(1)
+        self.assertEqual(conversation_object.id, 1)
+        self.assertEqual(conversation_object.messages[0].message_text, "Hello")
+        self.assertEqual(conversation_object.messages[2].message_text, "test_mess")
+        self.assertEqual(conversation_object.messages[2].summary, None)
+
+    def test_prepare_api_payload_empty_summary(self):
+        self.test_save_message_to_database()
+        conversation_object = find_conversation_by_conversation_id(1)
+        language, user_message, sum_up_sentence = prepare_api_payload(conversation_object.id)
+        self.assertEqual(sum_up_sentence, None)
+        self.assertEqual(language, conversation_object.language)
+        self.assertEqual(user_message, "test_mess")
+
+    def test_prepare_api_payload(self):
+        self.add_conversation_and_message()
+        conversation_object = find_conversation_by_conversation_id(1)
+        language, user_message, sum_up_sentence = prepare_api_payload(conversation_object.id)
+        self.assertEqual(sum_up_sentence, "Test")
+        self.assertEqual(language, conversation_object.language)
+        self.assertEqual(user_message, "Hello Again")
+
+    def test_message_for_api(self):
+        formatted_messages = message_for_api("Spanish", "Test", "Testing")
+        self.assertEqual(formatted_messages, [{"role": "system",
+                                               "content": f"You must return your whole response in JSON. You're a chat assistant fluent in Spanish. Always begin with a summary sentence (max 15 words). Then, provide a concise answer or question (max 10 words) related to Testing. \n \n It's crucial to respond ONLY in format with key such as summary and answer. Only JSON allowed"},
+                                              {"role": "user", "content": "Test"}])
+
+    def test_message_for_api_empty_summary(self):
+        formatted_messages = message_for_api("Spanish", "Test", None)
+        self.assertEqual(formatted_messages, [{"role": "system",
+                                               "content": f"You must return your whole response in JSON. You're a chat assistant fluent in Spanish. Always begin with a summary sentence (max 15 words). Then, provide a concise answer or question (max 10 words) related to sentence. \n \n It's crucial to respond ONLY in format with key such as summary and answer. Only JSON allowed"},
+                                              {"role": "user", "content": "Test"}])
+
+
+if __name__ == "__main__":
+    unittest.main()
