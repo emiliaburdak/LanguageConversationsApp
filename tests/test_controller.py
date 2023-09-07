@@ -141,7 +141,7 @@ class ControllerTests(TestCase):
         }
         return mock_response
 
-    def _prepare_and_call_get_chat_response(self, test_answer_summary):
+    def _prepare_and_call_get_chat_response(self, test_answer_summary, user_message="test_message"):
         bearer_token = self.test_login_required()
         conversation = Conversation(conversation_name="Test conversation", user_id=self.test_user.id,
                                     language='Spanish')
@@ -150,7 +150,7 @@ class ControllerTests(TestCase):
         mock_response = self._mock_response(test_answer_summary)
 
         with patch("openai.ChatCompletion.create", return_value=mock_response) as mock_openai_call:
-            input_data = {"TTS_message": "test_message"}
+            input_data = {"STT_message": user_message}
 
             chat_response = self.client.post(f"/response/{conversation.id}",
                                              headers={"Authorization": f"Bearer {bearer_token}"},
@@ -213,6 +213,12 @@ class ControllerTests(TestCase):
         mock_openai_call.assert_called_once()
         self.assert200(chat_response)
         self.assertEqual(decoded_chat_response["chat_message"], "I have technical problem with answer, please repeat")
+
+    def test_invalid_user_message(self):
+        test_answer_summary = '{"answer": "Test response from OpenAI", "summary": "Testing"}'
+        _, json_error, _, _ = self._prepare_and_call_get_chat_response(test_answer_summary, "")
+        json_data = json.loads(json_error.data)
+        self.assertEqual(json_data["error"], "I have technical problem with answer, please repeat")
 
 
 if __name__ == "__main__":
