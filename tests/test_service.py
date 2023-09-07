@@ -2,8 +2,7 @@ import json
 import unittest
 from flask_testing import TestCase
 from werkzeug.security import generate_password_hash
-from flask import jsonify
-from unittest.mock import patch
+from flask_jwt_extended import verify_jwt_in_request
 from app.service import find_all_conversations_names_ids, get_user_id_by_token_identify, \
     find_conversation_by_conversation_id, save_message_to_database, prepare_api_payload, message_for_api
 from app import db
@@ -35,18 +34,23 @@ class ServiceTests(TestCase):
         db.session.remove()
         db.drop_all()
 
-    # def test_login_required(self):
-    #     login = self.client.post("login", json=dict(username="testuser", password="testpassword"))
-    #     login_data = json.loads(login.data.decode("utf-8"))
-    #     bearer_token = login_data["token"]
-    #     return bearer_token
-    #
-    # def test_get_user_id_by_token_identify(self):
-    #     with patch('app.service.get_user_id_by_token_identify', return_value=self.test_user.id):
-    #         user_id = get_user_id_by_token_identify()
-    #         self.assertEqual(user_id, self.test_user.id)
-    #
-    # def test_find_all_conversations_names_ids(self):
+    def test_login_required(self):
+        login = self.client.post("login", json=dict(username="testuser", password="testpassword"))
+        login_data = json.loads(login.data.decode("utf-8"))
+        bearer_token = login_data["token"]
+        return bearer_token
+
+    def test_get_user_id_by_token_identify(self):
+        bearer_token = self.test_login_required()
+
+        # "Hey Flask, I want to simulate an HTTP request for this app."
+        with self.app.test_request_context(headers={"Authorization": f"Bearer {bearer_token}"}):
+
+            # if you want to manually ensure a JWT's presence
+            verify_jwt_in_request()
+
+            user_id = get_user_id_by_token_identify()
+            self.assertEqual(user_id, 1)
 
     def add_conversation_and_message(self):
         conversation1 = Conversation(conversation_name="Test Conversation 1", user_id=self.test_user.id,
@@ -58,6 +62,15 @@ class ServiceTests(TestCase):
         db.session.add(message1)
         db.session.add(message2)
         db.session.commit()
+
+    def test_find_all_conversations_names_ids(self):
+        self.add_conversation_and_message()
+        bearer_token = self.test_login_required()
+        with self.app.test_request_context(headers={"Authorization": f"Bearer {bearer_token}"}):
+            verify_jwt_in_request()
+            conversations_names_and_ids = find_all_conversations_names_ids()
+            self.assertEqual(conversations_names_and_ids[0]["id"], 1)
+            self.assertEqual(conversations_names_and_ids[0]["name"], "Test Conversation 1")
 
     def test_find_conversation_by_conversation_id(self):
         self.add_conversation_and_message()
