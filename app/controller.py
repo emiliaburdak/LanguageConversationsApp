@@ -24,10 +24,11 @@ def home():
 @jwt_required()
 def create_conversation():
     data_from_stt = request.get_json()
-    # assume that this json looks like this: {language='spanish', conversation_name= 'conv123'}
-    language = data_from_stt["language"]
-    conversation_name = data_from_stt["conversation_name"]
+    language = data_from_stt.get("language", None)
+    conversation_name = data_from_stt.get("conversation_name", None)
     user_id = get_user_id_by_token_identify()
+    if not language or not conversation_name:
+        return jsonify({"error": "No conversation name or language"}), 400
     new_conversation = Conversation(conversation_name=conversation_name, user_id=user_id, language=language)
 
     db.session.add(new_conversation)
@@ -70,7 +71,9 @@ def get_chat_response(conversation_id):
     # save to database stt
     # assume that this json looks like this: {TTS_message='blabla'}
     data_from_stt = request.get_json()
-    stt_message_text = data_from_stt["TTS_message"]
+    stt_message_text = data_from_stt.get("STT_message", None)
+    if not stt_message_text:
+        return jsonify({"error": "I have technical problem with answer, please repeat"}), 400
     save_message_to_database(stt_message_text, conversation_id, True, None)
 
     # Api messages preparation
