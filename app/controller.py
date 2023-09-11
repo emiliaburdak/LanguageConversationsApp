@@ -101,3 +101,36 @@ def get_chat_response(conversation_id):
         response_for_user = "I have technical problem with answer, please repeat"
 
     return jsonify({"chat_message": response_for_user})
+
+
+@controller.route("/guidance/<conversation_id>", methods=["POST"])
+@jwt_required()
+def hint_or_advanced_version(conversation_id):
+
+    # last message (chat_message) and conversation summary
+    conversation_object = find_conversation_by_conversation_id(conversation_id)
+    if len(conversation_object.messages) > 2:
+        last_message = conversation_object.messages[-1].message_text
+        summary = conversation_object.messages[-1].summary
+    else:
+        # frontend: make the advanced_version and hint as not active button
+        return jsonify({"error": "Please, start conversation before using hint or sentence advanced correction"}), 400
+
+    # get user message if there is any
+    user_attempt = request.get_json(silent=True)
+
+    # create message to chat
+    if user_attempt is None:
+        guidance_message = {"role": "system",
+                            "content": f"this is summary of all conversation '{summary}', give me example answer to this '{last_message}'"}
+    else:
+        guidance_message = {"role": "system",
+                            "content": f"this is summary of all conversation '{summary}', this is last message '{last_message}', transform this '{user_attempt}' to make it more linguistically advanced"}
+
+    # get chat response
+    openai.api_key = "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"
+    response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=guidance_message)
+
+    # return chat response
+    guidance_response = json.loads(response["choices"][0]["message"]["content"])
+    return jsonify({"guidance_response": guidance_response})
