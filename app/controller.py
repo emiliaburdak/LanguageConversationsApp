@@ -8,10 +8,9 @@ from . import db
 import openai
 from .service import (get_user_id_by_token_identify, find_all_conversations_names_ids,
                       find_conversation_by_conversation_id, save_message_to_database,
-                      prepare_api_payload, message_for_api, call_chat_response, prepare_messages)
+                      prepare_api_payload, message_for_api, call_chat_response, prepare_messages, ChatAPIError)
 
 controller = Blueprint("controller", __name__)
-
 
 @controller.route("/home", methods=["GET"])
 @jwt_required()
@@ -106,30 +105,42 @@ def get_chat_response(conversation_id):
 @controller.route("/hint/<conversation_id>", methods=["POST"])
 @jwt_required()
 def get_hint(conversation_id):
-    last_message, summary = prepare_messages(conversation_id)
-    guidance_message = [{"role": "user",
-                         "content": f"{summary}, give me only one sentence example answer to this '{last_message}'"}]
+    try:
+        last_message, summary = prepare_messages(conversation_id)
+        guidance_message = [{"role": "user",
+                             "content": f"{summary}, give me only one sentence example answer to this '{last_message}'"}]
+        # get chat_response
+        guidance_response = call_chat_response(guidance_message)
+        return jsonify({"guidance_response": guidance_response}), 200
 
-    # get chat_response
-    guidance_response = call_chat_response(guidance_message)
-    return jsonify({"guidance_response": guidance_response}), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except ChatAPIError as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @controller.route("/advanced_version/<conversation_id>", methods=["POST"])
 @jwt_required()
 def get_advanced_version(conversation_id):
-    last_message, summary = prepare_messages(conversation_id)
+    try:
+        last_message, summary = prepare_messages(conversation_id)
 
-    # handle invalid input
-    user_attempt = request.get_json(silent=True)
-    if user_attempt is None:
-        return jsonify({"error": "There is no sentence to correct, please use hint instead"})
+        # handle invalid input
+        user_attempt = request.get_json(silent=True)
+        if user_attempt is None:
+            return jsonify({"error": "There is no sentence to correct, please use hint instead"})
 
-    # create message to chat
-    user_attempt_message = user_attempt["chat_message"]
-    guidance_message = [{"role": "user",
-                         "content": f"{summary}, this is last message '{last_message}', transform this '{user_attempt_message}' to make it more linguistically advanced"}]
+        # create message to chat
+        user_attempt_message = user_attempt["chat_message"]
+        guidance_message = [{"role": "user",
+                             "content": f"{summary}, this is last message '{last_message}', transform this '{user_attempt_message}' to make it more linguistically advanced"}]
+        # get chat_response
+        guidance_response = call_chat_response(guidance_message)
+        return jsonify({"guidance_response": guidance_response}), 200
 
-    # get chat_response
-    guidance_response = call_chat_response(guidance_message)
-    return jsonify({"guidance_response": guidance_response}), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except ChatAPIError as e:
+        return jsonify({"error": str(e)}), 500
+
+
