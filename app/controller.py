@@ -71,7 +71,7 @@ def get_chat_response(conversation_id):
     # save to database stt
     # assume that this json looks like this: {TTS_message='blabla'}
     data_from_stt = request.get_json()
-    stt_message_text = data_from_stt.get("STT_message", None)
+    stt_message_text = data_from_stt.get("TTS_message", None)
     if not stt_message_text:
         return jsonify({"error": "I have technical problem with answer, please repeat"}), 400
     save_message_to_database(stt_message_text, conversation_id, True, None)
@@ -106,7 +106,6 @@ def get_chat_response(conversation_id):
 @controller.route("/guidance/<conversation_id>", methods=["POST"])
 @jwt_required()
 def hint_or_advanced_version(conversation_id):
-
     # last message (chat_message) and conversation summary
     conversation_object = find_conversation_by_conversation_id(conversation_id)
     if len(conversation_object.messages) > 2:
@@ -121,16 +120,16 @@ def hint_or_advanced_version(conversation_id):
 
     # create message to chat
     if user_attempt is None:
-        guidance_message = {"role": "system",
-                            "content": f"this is summary of all conversation '{summary}', give me example answer to this '{last_message}'"}
+        guidance_message = [{"role": "user",
+                             "content": f"{summary}, give me only one sentence example answer to this '{last_message}'"}]
     else:
-        guidance_message = {"role": "system",
-                            "content": f"this is summary of all conversation '{summary}', this is last message '{last_message}', transform this '{user_attempt}' to make it more linguistically advanced"}
+        guidance_message = [{"role": "user",
+                             "content": f"{summary}, this is last message '{last_message}', transform this '{user_attempt}' to make it more linguistically advanced"}]
 
     # get chat response
     openai.api_key = "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"
     response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=guidance_message)
 
     # return chat response
-    guidance_response = json.loads(response["choices"][0]["message"]["content"])
-    return jsonify({"guidance_response": guidance_response})
+    guidance_response = response["choices"][0]["message"]["content"]
+    return jsonify({"guidance_response": guidance_response}), 200
