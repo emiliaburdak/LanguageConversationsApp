@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify
 from flask_jwt_extended import get_jwt_identity
 from .models import User, Conversation, Message
 from . import db
+import openai
 
 service = Blueprint("service", __name__)
 
@@ -60,3 +61,25 @@ def message_for_api(language, user_message, sum_up_sentence):
     formatted_messages.insert(0, instruction)
 
     return formatted_messages
+
+
+def prepare_messages(conversation_id):
+    # last message (chat_message) and conversation summary
+    conversation_object = find_conversation_by_conversation_id(conversation_id)
+    if len(conversation_object.messages) > 2:
+        last_message = conversation_object.messages[-1].message_text
+        summary = conversation_object.messages[-1].summary
+    else:
+        return jsonify({"error": "Please, start conversation before using hint or sentence advanced correction"}), 400
+
+    return last_message, summary
+
+
+def call_chat_response(guidance_message):
+    # call chat to response
+    openai.api_key = "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"
+    response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=guidance_message)
+
+    # return chat response
+    guidance_response = response["choices"][0]["message"]["content"]
+    return guidance_response
