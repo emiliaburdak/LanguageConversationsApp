@@ -123,8 +123,9 @@ def hint_or_advanced_version(conversation_id):
         guidance_message = [{"role": "user",
                              "content": f"{summary}, give me only one sentence example answer to this '{last_message}'"}]
     else:
+        user_attempt_message = user_attempt["chat_message"]
         guidance_message = [{"role": "user",
-                             "content": f"{summary}, this is last message '{last_message}', transform this '{user_attempt}' to make it more linguistically advanced"}]
+                             "content": f"{summary}, this is last message '{last_message}', transform this '{user_attempt_message}' to make it more linguistically advanced"}]
 
     # get chat response
     openai.api_key = "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"
