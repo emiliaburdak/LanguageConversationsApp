@@ -8,7 +8,7 @@ from . import db
 import openai
 from .service import (get_user_id_by_token_identify, find_all_conversations_names_ids,
                       find_conversation_by_conversation_id, save_message_to_database,
-                      prepare_api_payload, message_for_api)
+                      prepare_api_payload, message_for_api, call_chat_response, prepare_messages)
 
 controller = Blueprint("controller", __name__)
 
@@ -103,34 +103,33 @@ def get_chat_response(conversation_id):
     return jsonify({"chat_message": response_for_user})
 
 
-@controller.route("/guidance/<conversation_id>", methods=["POST"])
+@controller.route("/hint/<conversation_id>", methods=["POST"])
 @jwt_required()
-def hint_or_advanced_version(conversation_id):
-    # last message (chat_message) and conversation summary
-    conversation_object = find_conversation_by_conversation_id(conversation_id)
-    if len(conversation_object.messages) > 2:
-        last_message = conversation_object.messages[-1].message_text
-        summary = conversation_object.messages[-1].summary
-    else:
-        # frontend: make the advanced_version and hint as not active button
-        return jsonify({"error": "Please, start conversation before using hint or sentence advanced correction"}), 400
+def get_hint(conversation_id):
+    last_message, summary = prepare_messages(conversation_id)
+    guidance_message = [{"role": "user",
+                         "content": f"{summary}, give me only one sentence example answer to this '{last_message}'"}]
 
-    # get user message if there is any
+    # get chat_response
+    guidance_response = call_chat_response(guidance_message)
+    return jsonify({"guidance_response": guidance_response}), 200
+
+
+@controller.route("/advanced_version/<conversation_id>", methods=["POST"])
+@jwt_required()
+def get_advanced_version(conversation_id):
+    last_message, summary = prepare_messages(conversation_id)
+
+    # handle invalid input
     user_attempt = request.get_json(silent=True)
+    if user_attempt is None:
+        return jsonify({"error": "There is no sentence to correct, please use hint instead"})
 
     # create message to chat
-    if user_attempt is None:
-        guidance_message = [{"role": "user",
-                             "content": f"{summary}, give me only one sentence example answer to this '{last_message}'"}]
-    else:
-        user_attempt_message = user_attempt["chat_message"]
-        guidance_message = [{"role": "user",
-                             "content": f"{summary}, this is last message '{last_message}', transform this '{user_attempt_message}' to make it more linguistically advanced"}]
+    user_attempt_message = user_attempt["chat_message"]
+    guidance_message = [{"role": "user",
+                         "content": f"{summary}, this is last message '{last_message}', transform this '{user_attempt_message}' to make it more linguistically advanced"}]
 
-    # get chat response
-    openai.api_key = "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"
-    response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=guidance_message)
-
-    # return chat response
-    guidance_response = response["choices"][0]["message"]["content"]
+    # get chat_response
+    guidance_response = call_chat_response(guidance_message)
     return jsonify({"guidance_response": guidance_response}), 200
