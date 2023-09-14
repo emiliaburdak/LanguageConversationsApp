@@ -7,6 +7,11 @@ import openai
 service = Blueprint("service", __name__)
 
 
+class ChatAPIError(Exception):
+    """Custom exception for handling chat API errors."""
+    pass
+
+
 def get_user_id_by_token_identify():
     username = get_jwt_identity()
     user_object = User.query.filter_by(username=username).first()
@@ -70,16 +75,19 @@ def prepare_messages(conversation_id):
         last_message = conversation_object.messages[-1].message_text
         summary = conversation_object.messages[-1].summary
     else:
-        return jsonify({"error": "Please, start conversation before using hint or sentence advanced correction"}), 400
-
+        raise ValueError("Please, start conversation before using hint or sentence advanced correction")
     return last_message, summary
 
 
 def call_chat_response(guidance_message):
-    # call chat to response
-    openai.api_key = "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"
-    response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=guidance_message)
+    try:
+        # call chat to response
+        openai.api_key = "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"
+        response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=guidance_message)
 
-    # return chat response
-    guidance_response = response["choices"][0]["message"]["content"]
-    return guidance_response
+        # return chat response
+        guidance_response = response["choices"][0]["message"]["content"]
+        return guidance_response
+
+    except (KeyError, ValueError) as e:
+        raise ChatAPIError("Failed to get a response from the chat") from e
