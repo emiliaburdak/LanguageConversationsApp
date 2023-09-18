@@ -2,9 +2,7 @@ import json
 import unittest
 from flask_testing import TestCase
 from werkzeug.security import generate_password_hash
-from flask import jsonify
 from unittest.mock import patch
-
 from app import db
 from app.models import User, Conversation, Message
 from main import app
@@ -150,7 +148,7 @@ class ControllerTests(TestCase):
         mock_response = self._mock_response(test_answer_summary)
 
         with patch("openai.ChatCompletion.create", return_value=mock_response) as mock_openai_call:
-            input_data = {"STT_message": user_message}
+            input_data = {"TTS_message": user_message}
 
             chat_response = self.client.post(f"/response/{conversation.id}",
                                              headers={"Authorization": f"Bearer {bearer_token}"},
@@ -219,6 +217,20 @@ class ControllerTests(TestCase):
         _, json_error, _, _ = self._prepare_and_call_get_chat_response(test_answer_summary, "")
         json_data = json.loads(json_error.data)
         self.assertEqual(json_data["error"], "I have technical problem with answer, please repeat")
+
+    def test_get_hint(self):
+        bearer_token = self._create_examples_to_db()
+        test_answer_summary = "This is your hint"
+        mock_response = self._mock_response(test_answer_summary)
+
+        with patch("openai.ChatCompletion.create", return_value=mock_response) as mock_openai_call:
+            guidance_response = self.client.post(f"/hint/1", headers={"Authorization": f"Bearer {bearer_token}"})
+            decode_guidance_response = json.loads(guidance_response.data.decode("utf-8"))
+
+            self.assertEqual(decode_guidance_response["guidance_response"], "This is your hint")
+
+
+
 
 
 if __name__ == "__main__":
