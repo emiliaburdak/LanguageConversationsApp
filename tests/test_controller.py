@@ -6,6 +6,7 @@ from unittest.mock import patch
 from app import db
 from app.models import User, Conversation, Message
 from main import app
+from app.service import ChatAPIError
 
 
 class ControllerTests(TestCase):
@@ -227,10 +228,86 @@ class ControllerTests(TestCase):
             guidance_response = self.client.post(f"/hint/1", headers={"Authorization": f"Bearer {bearer_token}"})
             decode_guidance_response = json.loads(guidance_response.data.decode("utf-8"))
 
+            mock_openai_call.assert_called_once()
             self.assertEqual(decode_guidance_response["guidance_response"], "This is your hint")
 
+    def test_none_input_get_advanced_version(self):
+        bearer_token = self._create_examples_to_db()
+        test_answer_summary = "This is your advanced version"
+        mock_response = self._mock_response(test_answer_summary)
 
+        with patch("openai.ChatCompletion.create", return_value=mock_response):
+            advanced_version_response = self.client.post(f"/advanced_version/1",
+                                                         headers={"Authorization": f"Bearer {bearer_token}"})
+            decode_advanced_version_response = json.loads(advanced_version_response.data.decode("utf-8"))
 
+            self.assertEqual(decode_advanced_version_response["error"],
+                             "There is no sentence to correct, please use hint instead")
+
+    def test_get_advanced_version(self):
+        bearer_token = self._create_examples_to_db()
+        test_answer_summary = "This is your advanced version"
+        mock_response = self._mock_response(test_answer_summary)
+
+        with patch("openai.ChatCompletion.create", return_value=mock_response) as mock_openai_call:
+            input_data = {"chat_message": "chat_message"}
+            advanced_version_response = self.client.post(f"/advanced_version/1",
+                                                         headers={"Authorization": f"Bearer {bearer_token}"},
+                                                         json=input_data)
+            decode_advanced_version_response = json.loads(advanced_version_response.data.decode("utf-8"))
+
+            mock_openai_call.assert_called_once()
+            self.assertEqual(decode_advanced_version_response["guidance_response"], "This is your advanced version")
+
+    def test_invalid_input_get_hint(self):
+        bearer_token = self.test_login_required()
+        conversation1 = Conversation(conversation_name="Test Conversation 1", user_id=self.test_user.id,
+                                     language="Spanish")
+        db.session.add(conversation1)
+        test_answer_summary = "This is your hint"
+        mock_response = self._mock_response(test_answer_summary)
+
+        with patch("openai.ChatCompletion.create", return_value=mock_response):
+            hint_response = self.client.post(f"/hint/1", headers={"Authorization": f"Bearer {bearer_token}"})
+            decode_hint_response = json.loads(hint_response.data.decode("utf-8"))
+
+            self.assertEqual(decode_hint_response["error"],
+                             "Please, start conversation before using hint or sentence advanced correction")
+
+    def test_invalid_input_advanced_version(self):
+        bearer_token = self.test_login_required()
+        conversation1 = Conversation(conversation_name="Test Conversation 1", user_id=self.test_user.id,
+                                     language="Spanish")
+        db.session.add(conversation1)
+        test_answer_summary = "This is your hint"
+        mock_response = self._mock_response(test_answer_summary)
+
+        with patch("openai.ChatCompletion.create", return_value=mock_response):
+            advanced_version_response = self.client.post(f"/advanced_version/1",
+                                                         headers={"Authorization": f"Bearer {bearer_token}"})
+            decode_advanced_version_response = json.loads(advanced_version_response.data.decode("utf-8"))
+
+            self.assertEqual(decode_advanced_version_response["error"],
+                             "Please, start conversation before using hint or sentence advanced correction")
+
+    def test_chat_api_error_get_hint(self):
+        bearer_token = self._create_examples_to_db()
+        with patch("openai.ChatCompletion.create", side_effect=ChatAPIError("Failed to get a response from the chat")):
+            hint_response = self.client.post(f"/hint/1", headers={"Authorization": f"Bearer {bearer_token}"})
+            decode_hint_response = json.loads(hint_response.data.decode("utf-8"))
+
+            self.assertEqual(decode_hint_response["error"], "Failed to get a response from the chat")
+
+    def test_chat_api_error_get_advanced_version(self):
+        bearer_token = self._create_examples_to_db()
+        with patch("openai.ChatCompletion.create", side_effect=ChatAPIError("Failed to get a response from the chat")):
+            input_data = {"chat_message": "chat_message"}
+            advanced_version_response = self.client.post(f"/advanced_version/1",
+                                                         headers={"Authorization": f"Bearer {bearer_token}"},
+                                                         json=input_data)
+            decode_advanced_version_response = json.loads(advanced_version_response.data.decode("utf-8"))
+
+            self.assertEqual(decode_advanced_version_response["error"], "Failed to get a response from the chat")
 
 
 if __name__ == "__main__":
