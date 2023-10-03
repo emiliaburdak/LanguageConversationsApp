@@ -162,7 +162,7 @@ def get_translation():
     word_translation = translator.translate_text(word_to_translate, source_lang=source_lang, target_lang=target_lang)
     sentence_translation = translator.translate_text(sentence_to_translate, source_lang=source_lang,
                                                      target_lang=target_lang)
-    jsonify({"word_translation": word_translation.text, "sentence_translation": sentence_translation.text})
+    return jsonify({"word_translation": word_translation.text, "sentence_translation": sentence_translation.text}), 200
 
 
 def save_to_db_dictionary(word_to_dictionary, translated_word, contex_sentence, source_lang, target_lang,
@@ -177,7 +177,7 @@ def save_to_db_dictionary(word_to_dictionary, translated_word, contex_sentence, 
 
 @controller.route("/dictionary", methods=["POST"])
 @jwt_required()
-def put_dictionary():
+def add_to_dictionary():
     to_dictionary_data = request.get_json()
     word_to_dictionary = to_dictionary_data["word_to_dictionary"]
     contex_sentence = to_dictionary_data["contex_sentence"]
@@ -198,4 +198,4 @@ def put_dictionary():
     save_to_db_dictionary(word_to_dictionary, translated_word, contex_sentence, source_lang, target_lang,
                           translated_contex_sentence)
 
-    return jsonify({"translated_word": translated_word, "translated_contex_sentence": translated_contex_sentence})
+    return jsonify({"translated_word": translated_word, "translated_contex_sentence": translated_contex_sentence}), 200
