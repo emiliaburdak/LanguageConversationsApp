@@ -1,9 +1,11 @@
 import json
+import deepl
 
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 from flask_jwt_extended import get_jwt_identity
-from .models import User, Conversation, Message
+
+from .models import User, Conversation, Message, Dictionary
 from . import db
 import openai
 from .service import (get_user_id_by_token_identify, find_all_conversations_names_ids,
@@ -11,6 +13,7 @@ from .service import (get_user_id_by_token_identify, find_all_conversations_name
                       prepare_api_payload, message_for_api, call_chat_response, prepare_messages, ChatAPIError)
 
 controller = Blueprint("controller", __name__)
+
 
 @controller.route("/home", methods=["GET"])
 @jwt_required()
@@ -144,3 +147,55 @@ def get_advanced_version(conversation_id):
         return jsonify({"error": str(e)}), 500
 
 
+@controller.route("/translation", methods=["POST"])
+@jwt_required()
+def get_translation():
+    to_translate_data = request.get_json()
+    word_to_translate = to_translate_data["word_to_translate"]
+    sentence_to_translate = to_translate_data["sentence_to_translate"]
+    source_lang = to_translate_data["source_lang"]
+    target_lang = to_translate_data["target_lang"]
+
+    auth_key = "909e67c2-5f8d-8fe9-8432-a790ba0061b2:fx"
+    translator = deepl.Translator(auth_key)
+
+    word_translation = translator.translate_text(word_to_translate, source_lang=source_lang, target_lang=target_lang)
+    sentence_translation = translator.translate_text(sentence_to_translate, source_lang=source_lang,
+                                                     target_lang=target_lang)
+    jsonify({"word_translation": word_translation.text, "sentence_translation": sentence_translation.text})
+
+
+def save_to_db_dictionary(word_to_dictionary, translated_word, contex_sentence, source_lang, target_lang,
+                          translated_contex_sentence):
+    user_id = get_user_id_by_token_identify()
+    new_word = Dictionary(user_id=user_id, word_to_dictionary=word_to_dictionary, translated_word=translated_word,
+                          contex_sentence=contex_sentence, source_lang=source_lang, target_lang=target_lang,
+                          translated_contex_sentence=translated_contex_sentence)
+    db.session.add(new_word)
+    db.session.commit()
+
+
+@controller.route("/dictionary", methods=["POST"])
+@jwt_required()
+def put_dictionary():
+    to_dictionary_data = request.get_json()
+    word_to_dictionary = to_dictionary_data["word_to_dictionary"]
+    contex_sentence = to_dictionary_data["contex_sentence"]
+    source_lang = to_dictionary_data["source_lang"]
+    target_lang = to_dictionary_data["target_lang"]
+
+    # translate-deepl
+    auth_key = "909e67c2-5f8d-8fe9-8432-a790ba0061b2:fx"
+    translator = deepl.Translator(auth_key)
+
+    word_translation = translator.translate_text(word_to_dictionary, source_lang=source_lang, target_lang=target_lang)
+    sentence_translation = translator.translate_text(contex_sentence, source_lang=source_lang,
+                                                     target_lang=target_lang)
+    translated_word = word_translation.text
+    translated_contex_sentence = sentence_translation.text
+
+    # save to db
+    save_to_db_dictionary(word_to_dictionary, translated_word, contex_sentence, source_lang, target_lang,
+                          translated_contex_sentence)
+
+    return jsonify({"translated_word": translated_word, "translated_contex_sentence": translated_contex_sentence})

@@ -8,6 +8,7 @@ class User(db.Model):
     name = db.Column(db.String(80), nullable=False)
     password = db.Column(db.String(200), nullable=False)
     conversations = db.relationship('Conversation', backref='user', passive_deletes=True)
+    dictionary = db.relationship('Dictionary', backref='user', passive_deletes=True)
 
 
 class Conversation(db.Model):
@@ -29,3 +30,12 @@ class Message(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
 
+class Dictionary(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    word_to_dictionary = db.Column(db.String(50))
+    translated_word = db.Column(db.String(50))
+    contex_sentence = db.Column(db.String(200))
+    translated_contex_sentence = db.Column(db.String(200))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    source_lang = db.Column(db.String(50))
+    target_lang = db.Column(db.String(50))
