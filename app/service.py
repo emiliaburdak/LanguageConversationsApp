@@ -1,8 +1,9 @@
 from flask import Blueprint, jsonify
 from flask_jwt_extended import get_jwt_identity
-from .models import User, Conversation, Message
+from .models import User, Conversation, Message, Dictionary
 from . import db
 import openai
+import deepl
 
 service = Blueprint("service", __name__)
 
@@ -71,9 +72,11 @@ def message_for_api(language, user_message, sum_up_sentence):
 def prepare_messages(conversation_id):
     # last message (chat_message) and conversation summary
     conversation_object = find_conversation_by_conversation_id(conversation_id)
-    if len(conversation_object.messages) > 2:
+    if len(conversation_object.messages) >= 2:
         last_message = conversation_object.messages[-1].message_text
-        summary = conversation_object.messages[-1].summary
+        # summary = conversation_object.messages[-1].summary
+        summary = getattr(conversation_object.messages[-1].summary, 'summary', None)
+
     else:
         raise ValueError("Please, start conversation before using hint or sentence advanced correction")
     return last_message, summary
@@ -91,3 +94,26 @@ def call_chat_response(guidance_message):
 
     except (KeyError, ValueError) as e:
         raise ChatAPIError("Failed to get a response from the chat") from e
+
+
+def save_to_db_dictionary(word_to_dictionary, translated_word, contex_sentence, source_lang, target_lang,
+                          translated_contex_sentence):
+    user_id = get_user_id_by_token_identify()
+    new_word = Dictionary(user_id=user_id, word_to_dictionary=word_to_dictionary, translated_word=translated_word,
+                          contex_sentence=contex_sentence, source_lang=source_lang, target_lang=target_lang,
+                          translated_contex_sentence=translated_contex_sentence)
+    db.session.add(new_word)
+    db.session.commit()
+
+
+def get_translate_deepl(word_to_translate, sentence_to_translate, source_lang, target_lang):
+    auth_key = "909e67c2-5f8d-8fe9-8432-a790ba0061b2:fx"
+    translator = deepl.Translator(auth_key)
+
+    translated_word = translator.translate_text(word_to_translate, source_lang=source_lang, target_lang=target_lang)
+    translated_sentence = translator.translate_text(sentence_to_translate, source_lang=source_lang,
+                                                    target_lang=target_lang)
+
+    return translated_word.text, translated_sentence.text
+
+
