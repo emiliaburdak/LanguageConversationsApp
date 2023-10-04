@@ -1,16 +1,18 @@
 import json
-import deepl
-
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 from flask_jwt_extended import get_jwt_identity
-
+import deepl
 from .models import User, Conversation, Message, Dictionary
 from . import db
 import openai
+import sqlalchemy
+from sqlalchemy import exc
+
 from .service import (get_user_id_by_token_identify, find_all_conversations_names_ids,
                       find_conversation_by_conversation_id, save_message_to_database,
-                      prepare_api_payload, message_for_api, call_chat_response, prepare_messages, ChatAPIError)
+                      prepare_api_payload, message_for_api, call_chat_response, prepare_messages, ChatAPIError,
+                      save_to_db_dictionary, get_translate_deepl)
 
 controller = Blueprint("controller", __name__)
 
@@ -150,52 +152,56 @@ def get_advanced_version(conversation_id):
 @controller.route("/translation", methods=["POST"])
 @jwt_required()
 def get_translation():
-    to_translate_data = request.get_json()
-    word_to_translate = to_translate_data["word_to_translate"]
-    sentence_to_translate = to_translate_data["sentence_to_translate"]
-    source_lang = to_translate_data["source_lang"]
-    target_lang = to_translate_data["target_lang"]
+    try:
+        to_translate_data = request.get_json()
+        word_to_translate = to_translate_data["word_to_translate"]
+        sentence_to_translate = to_translate_data["sentence_to_translate"]
+        source_lang = to_translate_data["source_lang"]
+        target_lang = to_translate_data["target_lang"]
 
-    auth_key = "909e67c2-5f8d-8fe9-8432-a790ba0061b2:fx"
-    translator = deepl.Translator(auth_key)
+        # translate-deepl
+        translated_word, translated_sentence = get_translate_deepl(word_to_translate, sentence_to_translate,
+                                                                   source_lang,
+                                                                   target_lang)
 
-    word_translation = translator.translate_text(word_to_translate, source_lang=source_lang, target_lang=target_lang)
-    sentence_translation = translator.translate_text(sentence_to_translate, source_lang=source_lang,
-                                                     target_lang=target_lang)
-    return jsonify({"word_translation": word_translation.text, "sentence_translation": sentence_translation.text}), 200
+        return jsonify({"translated_word": translated_word, "translated_sentence": translated_sentence}), 200
 
-
-def save_to_db_dictionary(word_to_dictionary, translated_word, contex_sentence, source_lang, target_lang,
-                          translated_contex_sentence):
-    user_id = get_user_id_by_token_identify()
-    new_word = Dictionary(user_id=user_id, word_to_dictionary=word_to_dictionary, translated_word=translated_word,
-                          contex_sentence=contex_sentence, source_lang=source_lang, target_lang=target_lang,
-                          translated_contex_sentence=translated_contex_sentence)
-    db.session.add(new_word)
-    db.session.commit()
+    except KeyError:
+        return jsonify(
+            {"error": "Incorrect data format. Make sure you press the word and try again."}), 400
 
 
 @controller.route("/dictionary", methods=["POST"])
 @jwt_required()
 def add_to_dictionary():
-    to_dictionary_data = request.get_json()
-    word_to_dictionary = to_dictionary_data["word_to_dictionary"]
-    contex_sentence = to_dictionary_data["contex_sentence"]
-    source_lang = to_dictionary_data["source_lang"]
-    target_lang = to_dictionary_data["target_lang"]
+    try:
+        to_dictionary_data = request.get_json()
+        word_to_dictionary = to_dictionary_data["word_to_dictionary"]
+        contex_sentence = to_dictionary_data["contex_sentence"]
+        source_lang = to_dictionary_data["source_lang"]
+        target_lang = to_dictionary_data["target_lang"]
 
-    # translate-deepl
-    auth_key = "909e67c2-5f8d-8fe9-8432-a790ba0061b2:fx"
-    translator = deepl.Translator(auth_key)
+        # translate-deepl
+        translated_word, translated_contex_sentence = get_translate_deepl(word_to_dictionary, contex_sentence,
+                                                                          source_lang,
+                                                                          target_lang)
+        # save to db
+        save_to_db_dictionary(word_to_dictionary, translated_word, contex_sentence, source_lang, target_lang,
+                              translated_contex_sentence)
 
-    word_translation = translator.translate_text(word_to_dictionary, source_lang=source_lang, target_lang=target_lang)
-    sentence_translation = translator.translate_text(contex_sentence, source_lang=source_lang,
-                                                     target_lang=target_lang)
-    translated_word = word_translation.text
-    translated_contex_sentence = sentence_translation.text
+        return jsonify(
+            {"translated_word": translated_word, "translated_contex_sentence": translated_contex_sentence}), 200
 
-    # save to db
-    save_to_db_dictionary(word_to_dictionary, translated_word, contex_sentence, source_lang, target_lang,
-                          translated_contex_sentence)
+    except KeyError:
+        return jsonify(
+            {"error": "Incorrect data format. Make sure you provide the word and try again."}), 400
 
-    return jsonify({"translated_word": translated_word, "translated_contex_sentence": translated_contex_sentence}), 200
+
+@controller.errorhandler(deepl.DeepLException)
+def handle_deepl_exception():
+    return jsonify({"error": "Translation mistake, try later"}), 500
+
+
+@controller.errorhandler(sqlalchemy.exc.SQLAlchemyError)
+def handle_sqlalchemy_exception():
+    return jsonify({"error": "Database error. I cannot save this word to the dictionary"}), 500
