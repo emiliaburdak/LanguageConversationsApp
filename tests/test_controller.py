@@ -309,6 +309,78 @@ class ControllerTests(TestCase):
 
             self.assertEqual(decode_advanced_version_response["error"], "Failed to get a response from the chat")
 
+    def _get_translation(self, payload_to_translation):
+        bearer_token = self.test_login_required()
+        translation_response = self.client.post(f"/translation",
+                                                headers={"Authorization": f"Bearer {bearer_token}"},
+                                                json=payload_to_translation)
+        decoded_translation_response = json.loads(translation_response.data.decode("utf-8"))
+        return decoded_translation_response
+
+    def test_correct_payload_to_translation(self):
+        payload_to_translation = {"word_to_translate": "computadora",
+                                  "sentence_to_translate": "me gusta usar mi computadora", "source_lang": "ES",
+                                  "target_lang": "EN-GB"}
+        decoded_translation_response = self._get_translation(payload_to_translation)
+        self.assertEqual(decoded_translation_response["translated_sentence"], "I like to use my computer")
+        self.assertEqual(decoded_translation_response["translated_word"], "computer")
+
+    def test_typo_in_payload_to_translation(self):
+        payload_to_translation = {"word_to_translate": "compatadora",
+                                  "sentence_to_translate": "me gusta usar mi compatadora", "source_lang": "ES",
+                                  "target_lang": "EN-GB"}
+        decoded_translation_response = self._get_translation(payload_to_translation)
+        self.assertEqual(decoded_translation_response["translated_sentence"], "I like to use my computer")
+        self.assertEqual(decoded_translation_response["translated_word"], "compatadora")
+
+    def test_invalid_payload_to_translation(self):
+        payload_to_translation = {"word_to_translate": "computadora",
+                                  "source_lang": "ES",
+                                  "target_lang": "EN-GB"}
+        decoded_translation_response = self._get_translation(payload_to_translation)
+        self.assertEqual(decoded_translation_response["error"],
+                         "Incorrect data format. Make sure you press the word and try again.")
+
+    def _add_to_dictionary(self, payload_to_dictionary):
+        bearer_token = self.test_login_required()
+        translation_response = self.client.post(f"/dictionary",
+                                                headers={"Authorization": f"Bearer {bearer_token}"},
+                                                json=payload_to_dictionary)
+        decoded_translation_response = json.loads(translation_response.data.decode("utf-8"))
+        return decoded_translation_response
+
+    def test_correct_payload_add_to_dictionary(self):
+        payload_to_dictionary = {
+            "word_to_dictionary": "computadora",
+            "contex_sentence": "me gusta usar mi computadora",
+            "source_lang": "ES",
+            "target_lang": "EN-GB"
+        }
+        decoded_translation_response = self._add_to_dictionary(payload_to_dictionary)
+        self.assertEqual(decoded_translation_response["translated_word"], "computer")
+        self.assertEqual(decoded_translation_response["translated_contex_sentence"], "I like to use my computer")
+
+    def test_typo_payload_add_to_dictionary(self):
+        payload_to_dictionary = {
+            "word_to_dictionary": "compatadora",
+            "contex_sentence": "me gusta usar mi computadora",
+            "source_lang": "ES",
+            "target_lang": "EN-GB"
+        }
+        decoded_translation_response = self._add_to_dictionary(payload_to_dictionary)
+        self.assertEqual(decoded_translation_response["translated_word"], "compatadora")
+        self.assertEqual(decoded_translation_response["translated_contex_sentence"], "I like to use my computer")
+
+    def test_invalid_payload_add_to_dictionary(self):
+        payload_to_dictionary = {
+            "word_to_dictionary": "computadora",
+            "contex_sentence": "me gusta usar mi computadora",
+            "target_lang": "EN-GB"
+        }
+        decoded_translation_response = self._add_to_dictionary(payload_to_dictionary)
+        self.assertEqual(decoded_translation_response["error"],
+                         "Incorrect data format. Make sure you provide the word and try again.")
+
 
 if __name__ == "__main__":
     unittest.main()
