@@ -7,9 +7,9 @@ from werkzeug.security import generate_password_hash
 from flask_jwt_extended import verify_jwt_in_request
 from app.service import find_all_conversations_names_ids, get_user_id_by_token_identify, \
     find_conversation_by_conversation_id, save_message_to_database, prepare_api_payload, message_for_api, \
-    prepare_messages, call_chat_response
+    prepare_messages, call_chat_response, save_to_db_dictionary, get_translate_deepl
 from app import db
-from app.models import User, Conversation, Message
+from app.models import User, Conversation, Message, Dictionary
 from main import app
 from app.controller import ChatAPIError
 
@@ -181,6 +181,28 @@ class ServiceTests(TestCase):
                              "content": f"{summary}, give me only one sentence example answer to this '{last_message}'"}]
         with patch("openai.ChatCompletion.create", side_effect=ChatAPIError("Failed to get a response from the chat")):
             self.assertRaises(ChatAPIError, lambda: call_chat_response(guidance_message))
+
+    def test_save_to_db_dictionary(self):
+        bearer_token = self.test_login_required()
+        with self.app.test_request_context(headers={"Authorization": f"Bearer {bearer_token}"}):
+            verify_jwt_in_request()
+            save_to_db_dictionary("computadora", "computer", "me gusta usar mi computadora", "ES", "EN-GB" , "I like to use my computer")
+            dictionary_object = Dictionary.query.filter_by(id=1).first()
+            self.assertEqual(dictionary_object.word_to_dictionary, "computadora")
+            self.assertEqual(dictionary_object.translated_word, "computer")
+            self.assertEqual(dictionary_object.contex_sentence, "me gusta usar mi computadora")
+            self.assertEqual(dictionary_object.translated_contex_sentence, "I like to use my computer")
+            self.assertEqual(dictionary_object.source_lang, "ES")
+            self.assertEqual(dictionary_object.target_lang, "EN-GB")
+            self.assertEqual(dictionary_object.user_id, 1)
+
+    def test_get_translate_deepl(self):
+        bearer_token = self.test_login_required()
+        with self.app.test_request_context(headers={"Authorization": f"Bearer {bearer_token}"}):
+            verify_jwt_in_request()
+            translated_word, translated_sentence = get_translate_deepl("computadora", "me gusta usar mi computadora", "ES", "EN-GB")
+            self.assertEqual(translated_word, "computer")
+            self.assertEqual(translated_sentence, "I like to use my computer")
 
 
 if __name__ == "__main__":
