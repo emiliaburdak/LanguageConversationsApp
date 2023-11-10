@@ -8,13 +8,16 @@ from . import db
 import openai
 import sqlalchemy
 from sqlalchemy import exc
-
+from abc import ABC, abstractmethod
+import redis
+from .cache import SimpleCache
 from .service import (get_user_id_by_token_identify, find_all_conversations_names_ids,
                       find_conversation_by_conversation_id, save_message_to_database,
                       prepare_api_payload, message_for_api, call_chat_response, prepare_messages, ChatAPIError,
                       save_to_db_dictionary, get_translate_deepl)
 
 controller = Blueprint("controller", __name__)
+cache = SimpleCache()
 
 
 @controller.route("/home", methods=["GET"])
@@ -159,12 +162,18 @@ def get_translation():
         source_lang = to_translate_data["source_lang"]
         target_lang = to_translate_data["target_lang"]
 
-        # translate-deepl
-        translated_word, translated_sentence = get_translate_deepl(word_to_translate, sentence_to_translate,
-                                                                   source_lang,
-                                                                   target_lang)
+        key = f'{word_to_translate}_{source_lang}_{target_lang}'
+        value = cache.get(key)
 
-        return jsonify({"translated_word": translated_word, "translated_sentence": translated_sentence}), 200
+        if not value:
+            translated_word, translated_sentence = get_translate_deepl(word_to_translate, sentence_to_translate,
+                                                                       source_lang, target_lang)
+
+            value = {"translated_word": translated_word, "translated_sentence": translated_sentence,
+                     "sentence_to_translate": sentence_to_translate}
+            cache.set(key, value)
+
+        return jsonify(value), 200
 
     except KeyError:
         return jsonify(
@@ -181,16 +190,21 @@ def add_to_dictionary():
         source_lang = to_dictionary_data["source_lang"]
         target_lang = to_dictionary_data["target_lang"]
 
-        # translate-deepl
-        translated_word, translated_contex_sentence = get_translate_deepl(word_to_dictionary, contex_sentence,
-                                                                          source_lang,
-                                                                          target_lang)
-        # save to db
-        save_to_db_dictionary(word_to_dictionary, translated_word, contex_sentence, source_lang, target_lang,
-                              translated_contex_sentence)
+        key = f'{word_to_dictionary}_{source_lang}_{target_lang}'
+        value = cache.get(key)
 
-        return jsonify(
-            {"translated_word": translated_word, "translated_contex_sentence": translated_contex_sentence}), 200
+        if not value:
+            translated_word, translated_contex_sentence = get_translate_deepl(word_to_dictionary, contex_sentence,
+                                                                              source_lang, target_lang)
+
+            save_to_db_dictionary(word_to_dictionary, translated_word, contex_sentence, source_lang, target_lang,
+                                  translated_contex_sentence)
+
+            value = {"translated_word": translated_word, "translated_contex_sentence": translated_contex_sentence,
+                     "contex_sentence": contex_sentence}
+            cache.set(key, value)
+
+        return jsonify(value), 200
 
     except KeyError:
         return jsonify(
