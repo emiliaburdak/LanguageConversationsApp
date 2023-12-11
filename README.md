@@ -5,7 +5,7 @@ Conversational application, which simulates real-time spoken dialogue
 This app, created using Flask, is made to mimic real conversations, using technologies like Speech-to-Text (STT) and Text-to-Speech (TTS), along with OpenAI's GPT-3.5-turbo model. It provides a full communication experience with easy-to-use features such as secure login with JWT tokens, improving sentences, giving example answer, translating using Deepl API, and creating personal dictionary filled with words and sentences you marked during conversations.
 
 ## Features
-**Real-time Dialogue Simulation**: Utilizes STT and TTS for dynamic conversations.
+- **Real-time Dialogue Simulation**: Utilizes STT and TTS for dynamic conversations.
 - **OpenAI GPT-3.5 Integration**: Leverages the power of GPT-3.5-turbo for intelligent responses.
 - **Secure Authentication**: Implements JWT tokens for secure access.
 - **Sentence Enhancement**: Refines and improves user input sentences.
