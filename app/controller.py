@@ -3,13 +3,12 @@ from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 from flask_jwt_extended import get_jwt_identity
 import deepl
+import os
 from .models import User, Conversation, Message, Dictionary
 from . import db
 import openai
 import sqlalchemy
 from sqlalchemy import exc
-from abc import ABC, abstractmethod
-import redis
 from .cache import SimpleCache
 from .service import (get_user_id_by_token_identify, find_all_conversations_names_ids,
                       find_conversation_by_conversation_id, save_message_to_database,
@@ -18,6 +17,8 @@ from .service import (get_user_id_by_token_identify, find_all_conversations_name
 
 controller = Blueprint("controller", __name__)
 cache = SimpleCache()
+OPENAI_TOKEN = os.environ.get('OPENAI_TOKEN')
+DEEPL_TOKEN = os.environ.get('DEEPL_TOKEN')
 
 
 @controller.route("/home", methods=["GET"])
@@ -88,7 +89,7 @@ def get_chat_response(conversation_id):
     messages_for_api = message_for_api(language, user_message, sum_up_sentence)
 
     # Api
-    openai.api_key = "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"
+    openai.api_key = OPENAI_TOKEN
     response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=messages_for_api)
 
     # get chat response

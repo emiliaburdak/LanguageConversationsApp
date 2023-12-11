@@ -2,10 +2,13 @@ from flask import Blueprint, jsonify
 from flask_jwt_extended import get_jwt_identity
 from .models import User, Conversation, Message, Dictionary
 from . import db
+import os
 import openai
 import deepl
 
 service = Blueprint("service", __name__)
+OPENAI_TOKEN = os.environ.get('OPENAI_TOKEN')
+DEEPL_TOKEN = os.environ.get('DEEPL_TOKEN')
 
 
 class ChatAPIError(Exception):
@@ -85,7 +88,7 @@ def prepare_messages(conversation_id):
 def call_chat_response(guidance_message):
     try:
         # call chat to response
-        openai.api_key = "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"
+        openai.api_key = OPENAI_TOKEN
         response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=guidance_message)
 
         # return chat response
@@ -107,7 +110,7 @@ def save_to_db_dictionary(word_to_dictionary, translated_word, contex_sentence, 
 
 
 def get_translate_deepl(word_to_translate, sentence_to_translate, source_lang, target_lang):
-    auth_key = "909e67c2-5f8d-8fe9-8432-a790ba0061b2:fx"
+    auth_key = DEEPL_TOKEN
     translator = deepl.Translator(auth_key)
 
     translated_word = translator.translate_text(word_to_translate, source_lang=source_lang, target_lang=target_lang)
